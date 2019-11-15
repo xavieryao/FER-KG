@@ -1,11 +1,23 @@
+import os
+
 import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.optim import Adam
 from torch.utils.tensorboard import SummaryWriter
 
-
 from kg_data import FB5KDataset
+
+
+class SavableModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def save(self, path):
+        torch.save(self.state_dict(), path)
+
+    def load(self, path):
+        self.load_state_dict(torch.load(path))
 
 
 class MarginRankingLoss(nn.Module):
@@ -18,7 +30,7 @@ class MarginRankingLoss(nn.Module):
         return torch.mean(torch.max(torch.Tensor([0]), dist))
 
 
-class TransEModel(nn.Module):
+class TransEModel(SavableModel):
     def __init__(self, num_entities, num_relations, embed_dim):
         super().__init__()
         self.num_entities = num_entities
@@ -47,7 +59,7 @@ def validate(model: nn.Module):
     return score
 
 
-def train(model: nn.Module):
+def train(model: SavableModel):
     train_writer = SummaryWriter('runs/TransE_train')
     val_writer = SummaryWriter('runs/TransE_val')
     dataset = FB5KDataset.get_instance()
@@ -55,6 +67,13 @@ def train(model: nn.Module):
     criterion: nn.Module = MarginRankingLoss(margin=1.0)
     optimizer = Adam(model.parameters(), weight_decay=0.01)
 
+    try:
+        os.mkdir('checkpoints')
+        os.mkdir('runs')
+    except FileExistsError:
+        pass
+
+    best_val_score = float('+inf')
     for epoch in range(10):
         data_generator = dataset.get_batch_generator(batch_size=16)
         running_loss = 0.0
@@ -93,10 +112,16 @@ def train(model: nn.Module):
                 steps = epoch * (len(dataset.triples) + 15) // 16 + i
                 val_writer.add_scalar('score', valid_score, steps)
 
+                if valid_score < best_val_score:
+                    best_val_score = valid_score
+                    model.save('checkpoints/trans-e-best.pt')
+
 
 if __name__ == '__main__':
     def main():
         dataset = FB5KDataset.get_instance()
         model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=30)
         train(model)
+
+
     main()
