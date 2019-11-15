@@ -2,21 +2,7 @@ from torch import nn
 import torch
 from torch.nn import functional as F
 from kg_data import FB5KDataset
-
-
-class RankingLoss(nn.Module):
-    def __init__(self, margin):
-        super().__init__()
-        self.margin = margin
-
-    @staticmethod
-    def score(s, r, t):
-        return F.normalize(s + r - t, 2, -1)
-
-    def forward(self, batch):
-        pos_score = self.score(batch["s"], batch["r"], batch["o"])
-        neg_score = self.score(batch["s'"], batch["r"], batch["o'"])
-        return self.margin + pos_score - neg_score
+import random
 
 
 class TransEModel(nn.Module):
@@ -33,14 +19,11 @@ class TransEModel(nn.Module):
         nn.init.xavier_uniform_(self.r_embeddings.weight)
 
     def forward(self, batch):
-        # input:  (s, r, o, s', o') * B
-        # output:  embeddings of (s, r, o, s', o') * B * N
-        outputs = torch.stack([
-            self.e_embeddings(batch["s"]),
-            self.r_embeddings(batch["r"]),
-            self.e_embeddings(batch["o"]),
-            self.e_embeddings(batch["s'"]),
-            self.e_embeddings(batch["o'"]),
-        ])
-        outputs = F.normalize(outputs, p=2, dim=-1)
-        return outputs
+        s, o = self.e_embeddings(batch['s']), self.e_embeddings(batch['o'])
+        r = self.r_embeddings(batch['r'])
+        s, r, o = [F.normalize(x, p=2, dim=-1) for x in (s, r, o)]
+        return F.normalize(s + r - o, 1, -1)
+
+
+def train(model):
+    dataset = FB5KDataset()
