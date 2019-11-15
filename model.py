@@ -50,6 +50,14 @@ class TransEModel(SavableModel):
         s, r, o = [F.normalize(x, p=2, dim=-1) for x in (s, r, o)]
         return torch.norm(s + r - o, p=1, dim=-1)
 
+    def export_entity_embeddings(self):
+        embs = F.normalize(self.e_embeddings.weight, p=2, dim=-1)
+        return embs.detach().numpy()
+
+    def export_relation_embeddings(self):
+        embs = F.normalize(self.r_embeddings.weight, p=2, dim=-1)
+        return embs.detach().numpy()
+
 
 def validate(model: nn.Module):
     dataset = FB5KDataset.get_instance()
@@ -120,7 +128,7 @@ def train(model: SavableModel):
 if __name__ == '__main__':
     def main():
         dataset = FB5KDataset.get_instance()
-        model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=30)
+        model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=50)
         train(model)
 
 
