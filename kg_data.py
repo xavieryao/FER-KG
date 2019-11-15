@@ -1,4 +1,5 @@
 from collections import Counter
+import torch
 import random
 
 
@@ -38,6 +39,20 @@ class FB5KDataset:
             return new_e, r, o
         else:
             return s, r, new_e
+
+    def convert_triples_to_batch(self, triples):
+        batch = {
+            's': [],
+            'r': [],
+            'o': []
+        }
+        for s, r, o in triples:
+            batch['s'].append(self.e2id[s])
+            batch['r'].append(self.r2id[r])
+            batch['o'].append(self.e2id[o])
+        for k, v in batch.items():
+            batch[k] = torch.LongTensor(v)
+        return batch
 
     def get_batch_generator(self, batch_size, shuffle=True):
         all_triples_set = set(self.triples)
