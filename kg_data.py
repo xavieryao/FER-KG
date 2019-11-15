@@ -4,7 +4,7 @@ from collections import Counter
 class FB5KDataset:
     def __init__(self):
         # read data
-        with open('FB15K/train.txt') as f:
+        with open('../FB15K/train.txt') as f:
             self.triples = []
             for line in f:
                 self.triples.append(tuple(line[:-1].split('\t')))
