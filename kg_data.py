@@ -4,6 +4,14 @@ import random
 
 
 class FB5KDataset:
+    _instance = None
+
+    @classmethod
+    def get_instance(cls):
+        if not cls._instance:
+            cls._instance = FB5KDataset()
+        return cls._instance
+
     def __init__(self):
         # read data
         with open('../FB15K/train.txt') as f:
@@ -28,13 +36,13 @@ class FB5KDataset:
             self.e2id[e] = i
             self.id2e[i] = e
         unk_idx = len(self.e2id)
-        self.e2id['<UNK>'] = unk_idx + 1
+        self.e2id['<UNK>'] = unk_idx
         self.id2e[unk_idx] = '<UNK>'
         for i, (r, _) in enumerate(relation_counter.most_common()):
             self.r2id[r] = i
             self.id2r[i] = r
         unk_idx = len(self.r2id)
-        self.r2id['<UNK>'] = unk_idx + 1
+        self.r2id['<UNK>'] = unk_idx
         self.id2r[unk_idx] = '<UNK>'
 
         # placeholders for other fields
@@ -75,9 +83,9 @@ class FB5KDataset:
             'o': []
         }
         for s, r, o in triples:
-            batch['s'].append(self.e2id[s])
-            batch['r'].append(self.r2id[r])
-            batch['o'].append(self.e2id[o])
+            batch['s'].append(self.e2id.get(s, self.e2id['<UNK>']))
+            batch['r'].append(self.r2id.get(r, self.r2id['<UNK>']))
+            batch['o'].append(self.e2id.get(o, self.e2id['<UNK>']))
         for k, v in batch.items():
             batch[k] = torch.LongTensor(v)
         return batch
