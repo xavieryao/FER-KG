@@ -15,14 +15,14 @@ class FB5KDataset:
     def __init__(self):
         # read data
         with open('../FB15K/train.txt') as f:
-            self.triples = []
+            self.triplets = []
             for line in f:
-                self.triples.append(tuple(line[:-1].split('\t')))
+                self.triplets.append(tuple(line[:-1].split('\t')))
 
         # count entities and relations
         entity_counter = Counter()
         relation_counter = Counter()
-        for (s, r, o) in self.triples:
+        for (s, r, o) in self.triplets:
             entity_counter[s] += 1
             entity_counter[o] += 1
             relation_counter[r] += 1
@@ -46,43 +46,43 @@ class FB5KDataset:
         self.id2r[unk_idx] = '<UNK>'
 
         # placeholders for other fields
-        self._valid_triples = None
-        self._test_triples = None
+        self._valid_triplets = None
+        self._test_triplets = None
 
     @property
-    def valid_triples(self):
-        if self._valid_triples is None:
-            self._valid_triples = []
+    def valid_triplets(self):
+        if self._valid_triplets is None:
+            self._valid_triplets = []
             with open('../FB15K/valid.txt') as f:
                 for line in f:
-                    self._valid_triples.append(tuple(line[:-1].split('\t')))
-        return self._valid_triples
+                    self._valid_triplets.append(tuple(line[:-1].split('\t')))
+        return self._valid_triplets
 
     @property
-    def test_triples(self):
-        if self._test_triples is None:
-            self._test_triples = []
+    def test_triplets(self):
+        if self._test_triplets is None:
+            self._test_triplets = []
             with open('../FB15K/test.txt') as f:
                 for line in f:
-                    self._test_triples.append(tuple(line[:-1].split('\t')))
-        return self._test_triples
+                    self._test_triplets.append(tuple(line[:-1].split('\t')))
+        return self._test_triplets
 
     @staticmethod
-    def _get_new_triple(corruption, old_triple, all_entities):
-        s, r, o = old_triple
+    def _get_new_triplet(corruption, old_triplet, all_entities):
+        s, r, o = old_triplet
         new_e = random.choice(all_entities)
         if corruption == 's':
             return new_e, r, o
         else:
             return s, r, new_e
 
-    def convert_triples_to_batch(self, triples):
+    def convert_triplets_to_batch(self, triplets):
         batch = {
             's': [],
             'r': [],
             'o': []
         }
-        for s, r, o in triples:
+        for s, r, o in triplets:
             batch['s'].append(self.e2id.get(s, self.e2id['<UNK>']))
             batch['r'].append(self.r2id.get(r, self.r2id['<UNK>']))
             batch['o'].append(self.e2id.get(o, self.e2id['<UNK>']))
@@ -91,38 +91,27 @@ class FB5KDataset:
         return batch
 
     def get_batch_generator(self, batch_size, shuffle=True):
-        all_triples_set = set(self.triples)
-        all_triples = list(all_triples_set)
+        all_triplets_set = set(self.triplets)
+        all_triplets = list(all_triplets_set)
         all_entities = list(self.e2id.keys())
 
         if shuffle:
-            random.shuffle(all_triples)
-        num_batches = (len(all_triples) + batch_size - 1) // batch_size
+            random.shuffle(all_triplets)
+        num_batches = (len(all_triplets) + batch_size - 1) // batch_size
         for i in range(num_batches):
-            batch_triples = all_triples[i * batch_size: (i+1) * batch_size]
-            neg_triples = []
-            pos_triples = []
-            for (s, r, o) in batch_triples:
+            batch_triplets = all_triplets[i * batch_size: (i+1) * batch_size]
+            neg_triplets = []
+            pos_triplets = []
+            for (s, r, o) in batch_triplets:
                 corruption = random.choice(['s', 'o'])
-                new_triple = self._get_new_triple(corruption, (s, r, o), all_entities)
+                new_triplet = self._get_new_triplet(corruption, (s, r, o), all_entities)
                 retry = 5
-                while retry > 0 and new_triple in all_triples_set:
+                while retry > 0 and new_triplet in all_triplets_set:
                     retry -= 1
-                    new_triple = self._get_new_triple(corruption, (s, r, o), all_entities)
-                if new_triple in all_triples_set:
+                    new_triplet = self._get_new_triplet(corruption, (s, r, o), all_entities)
+                if new_triplet in all_triplets_set:
                     continue
-                pos_triples.append((s, r, o))
-                neg_triples.append(new_triple)
-            yield pos_triples, neg_triples
+                pos_triplets.append((s, r, o))
+                neg_triplets.append(new_triplet)
+            yield pos_triplets, neg_triplets
 
-
-if __name__ == '__main__':
-    ds = FB5KDataset()
-    valid_triples = ds.valid_triples
-    for (s, r, o) in valid_triples:
-        if s not in ds.e2id:
-            print(s)
-        if o not in ds.e2id:
-            print(o)
-        if r not in ds.r2id:
-            print(r)

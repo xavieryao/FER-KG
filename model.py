@@ -53,7 +53,7 @@ class TransEModel(SavableModel):
 
 def validate(model: nn.Module):
     dataset = FB5KDataset.get_instance()
-    batch = dataset.convert_triples_to_batch(dataset.valid_triples)
+    batch = dataset.convert_triplets_to_batch(dataset.valid_triplets)
     scores = model(batch)
     score = torch.mean(scores).item()
     return score
@@ -78,9 +78,9 @@ def train(model: SavableModel):
         data_generator = dataset.get_batch_generator(batch_size=16)
         running_loss = 0.0
         running_score = 0.0
-        for i, (pos_triples, neg_triples) in enumerate(data_generator):
-            pos_batch = dataset.convert_triples_to_batch(pos_triples)
-            neg_batch = dataset.convert_triples_to_batch(neg_triples)
+        for i, (pos_triplets, neg_triplets) in enumerate(data_generator):
+            pos_batch = dataset.convert_triplets_to_batch(pos_triplets)
+            neg_batch = dataset.convert_triplets_to_batch(neg_triplets)
 
             optimizer.zero_grad()
 
@@ -97,7 +97,7 @@ def train(model: SavableModel):
             if i % 100 == 99:
                 print('[%d, %5d]     loss: %.6f     score: %.6f' %
                       (epoch + 1, i + 1, running_loss / 100, running_score / 100))
-                steps = epoch * (len(dataset.triples) + 15) // 16 + i
+                steps = epoch * (len(dataset.triplets) + 15) // 16 + i
                 train_writer.add_scalar('epoch', epoch + 1, steps)
                 train_writer.add_scalar('loss', running_loss / 100, steps)
                 train_writer.add_scalar('score', running_score / 100, steps)
@@ -109,7 +109,7 @@ def train(model: SavableModel):
                 valid_score = validate(model)
                 print('[%d, %5d]     validation score: %.6f' %
                       (epoch + 1, i + 1, valid_score))
-                steps = epoch * (len(dataset.triples) + 15) // 16 + i
+                steps = epoch * (len(dataset.triplets) + 15) // 16 + i
                 val_writer.add_scalar('score', valid_score, steps)
 
                 if valid_score < best_val_score:
