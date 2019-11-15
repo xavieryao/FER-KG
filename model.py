@@ -3,7 +3,7 @@ import os
 import torch
 from torch import nn
 from torch.nn import functional as F
-from torch.optim import Adam
+from torch.optim import Adam, SGD
 from torch.utils.tensorboard import SummaryWriter
 
 from kg_data import FB5KDataset
@@ -73,7 +73,8 @@ def train(model: SavableModel):
     dataset = FB5KDataset.get_instance()
 
     criterion: nn.Module = MarginRankingLoss(margin=1.0)
-    optimizer = Adam(model.parameters(), weight_decay=0.01)
+    #  optimizer = Adam(model.parameters(), weight_decay=0.01)
+    optimizer = SGD(model.parameters(), lr=0.01, weight_decay=0.01)
 
     try:
         os.mkdir('checkpoints')
