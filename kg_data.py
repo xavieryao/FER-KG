@@ -27,9 +27,37 @@ class FB5KDataset:
         for i, (e, _) in enumerate(entity_counter.most_common()):
             self.e2id[e] = i
             self.id2e[i] = e
+        unk_idx = len(self.e2id)
+        self.e2id['<UNK>'] = unk_idx + 1
+        self.id2e[unk_idx] = '<UNK>'
         for i, (r, _) in enumerate(relation_counter.most_common()):
             self.r2id[r] = i
             self.id2r[i] = r
+        unk_idx = len(self.r2id)
+        self.r2id['<UNK>'] = unk_idx + 1
+        self.id2r[unk_idx] = '<UNK>'
+
+        # placeholders for other fields
+        self._valid_triples = None
+        self._test_triples = None
+
+    @property
+    def valid_triples(self):
+        if self._valid_triples is None:
+            self._valid_triples = []
+            with open('../FB15K/valid.txt') as f:
+                for line in f:
+                    self._valid_triples.append(tuple(line[:-1].split('\t')))
+        return self._valid_triples
+
+    @property
+    def test_triples(self):
+        if self._test_triples is None:
+            self._test_triples = []
+            with open('../FB15K/test.txt') as f:
+                for line in f:
+                    self._test_triples.append(tuple(line[:-1].split('\t')))
+        return self._test_triples
 
     @staticmethod
     def _get_new_triple(corruption, old_triple, all_entities):
@@ -78,3 +106,15 @@ class FB5KDataset:
                 pos_triples.append((s, r, o))
                 neg_triples.append(new_triple)
             yield pos_triples, neg_triples
+
+
+if __name__ == '__main__':
+    ds = FB5KDataset()
+    valid_triples = ds.valid_triples
+    for (s, r, o) in valid_triples:
+        if s not in ds.e2id:
+            print(s)
+        if o not in ds.e2id:
+            print(o)
+        if r not in ds.r2id:
+            print(r)
