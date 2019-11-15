@@ -2,6 +2,8 @@ import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.optim import Adam
+from torch.utils.tensorboard import SummaryWriter
+
 
 from kg_data import FB5KDataset
 
@@ -46,6 +48,8 @@ def validate(model: nn.Module):
 
 
 def train(model: nn.Module):
+    train_writer = SummaryWriter('runs/TransE_train')
+    val_writer = SummaryWriter('runs/TransE_val')
     dataset = FB5KDataset.get_instance()
 
     criterion: nn.Module = MarginRankingLoss(margin=1.0)
@@ -74,6 +78,11 @@ def train(model: nn.Module):
             if i % 100 == 99:
                 print('[%d, %5d]     loss: %.6f     score: %.6f' %
                       (epoch + 1, i + 1, running_loss / 100, running_score / 100))
+                steps = epoch * (len(dataset.triples) + 15) // 16 + i
+                train_writer.add_scalar('epoch', epoch + 1, steps)
+                train_writer.add_scalar('loss', running_loss / 100, steps)
+                train_writer.add_scalar('score', running_score / 100, steps)
+
                 running_loss = 0.0
                 running_score = 0.0
 
@@ -81,6 +90,8 @@ def train(model: nn.Module):
                 valid_score = validate(model)
                 print('[%d, %5d]     validation score: %.6f' %
                       (epoch + 1, i + 1, valid_score))
+                steps = epoch * (len(dataset.triples) + 15) // 16 + i
+                val_writer.add_scalar('score', valid_score, steps)
 
 
 if __name__ == '__main__':
