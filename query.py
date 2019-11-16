@@ -1,7 +1,6 @@
 from scipy.spatial import KDTree
 from kg_data import FB5KDataset
-from model import TransEModel, SavableModel
-from tqdm import tqdm
+from model import TransEModel
 import random
 
 
@@ -15,7 +14,7 @@ def kg_completion(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
     for (s, r, o_true) in triplets:
         n += 1
         s_vec = e_embeddings[kg.e2id[s]]
-        r_vec = e_embeddings[kg.r2id[r]]
+        r_vec = r_embeddings[kg.r2id[r]]
         o_true_idx = kg.e2id[o_true]
         pred_vec = s_vec + r_vec
         _, top_k_indices = kdtree.query([pred_vec], k=10, p=1)
