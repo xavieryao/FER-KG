@@ -73,8 +73,8 @@ def train(model: SavableModel):
     dataset = FB5KDataset.get_instance()
 
     criterion: nn.Module = MarginRankingLoss(margin=1.0)
-    #  optimizer = Adam(model.parameters(), weight_decay=0.01)
-    optimizer = SGD(model.parameters(), lr=0.01, weight_decay=0.01)
+    optimizer = Adam(model.parameters(), weight_decay=0.01)
+    #  optimizer = SGD(model.parameters(), lr=0.01, weight_decay=0.01)
 
     try:
         os.mkdir('checkpoints')
