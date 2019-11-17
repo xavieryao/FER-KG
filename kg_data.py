@@ -120,7 +120,8 @@ class FB5KDataset:
 
 
 class FilteredFB5KDataset:
-    def __init__(self, kg: FB5KDataset, min_entity_freq=0., max_entity_freq=1., min_relation_freq=0., max_relation_freq=1.):
+    def __init__(self, kg: FB5KDataset, min_entity_freq=0., max_entity_freq=1., min_relation_freq=0.,
+                 max_relation_freq=1.):
         self.kg = kg
 
         self.e2id = kg.e2id
@@ -133,7 +134,7 @@ class FilteredFB5KDataset:
         self.entities = kg.entity_counter.most_common()[
                         int(num_entities * (1 - max_entity_freq)): int(num_entities * (1 - min_entity_freq))]
         self.relations = kg.relation_counter.most_common()[
-                        int(num_relations * (1 - max_relation_freq)): int(num_relations * (1 - min_relation_freq))]
+                         int(num_relations * (1 - max_relation_freq)): int(num_relations * (1 - min_relation_freq))]
 
         entity_set = set(x[0] for x in self.entities)
         relation_set = set(x[0] for x in self.relations)
@@ -177,32 +178,62 @@ class FilteredFB5KDataset:
             forward_path.append(('r', next_triplet[1]))
             forward_path.append(('e', next_triplet[2]))
         for i in range(length):
-            triplets = tail_to_triplets[forward_path[-1][1]]
+            triplets = tail_to_triplets[backward_path[-1][1]]
             if len(triplets) == 0:
                 break
             next_triplet = random.choice(triplets)
-            forward_path.append(('r', next_triplet[1]))
-            forward_path.append(('e', next_triplet[0]))
+            backward_path.append(('r', next_triplet[1]))
+            backward_path.append(('e', next_triplet[0]))
         return forward_path, backward_path
 
-    def get_batch_generator(self, batch_size, e_embeddings, r_embeddings, length, shuffle=True):
+    def get_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, length, shuffle=True):
         all_triplets = self.train_triplets
-        # build index
 
         if shuffle:
             random.shuffle(all_triplets)
         num_batches = (len(all_triplets) + batch_size - 1) // batch_size
         for i in range(num_batches):
             batch_triplets = all_triplets[i * batch_size: (i + 1) * batch_size]
+            entities_in_batch = []
+            batch = []
+            for s, _, o in batch_triplets:
+                entities_in_batch.append(s)
+                entities_in_batch.append(o)
+            for entity in entities_in_batch:
+                forward_path, backward_path = self.sample_relational_path(entity, length, self.train_head_to_triplets,
+                                                                          self.train_tail_to_triplets)
+                for _ in range(length - (len(forward_path) - 1) // 2):
+                    forward_path.append(('PAD', ''))
+                    forward_path.append(('PAD', ''))
+                for _ in range(length - (len(backward_path) - 1) // 2):
+                    backward_path.append(('PAD', ''))
+                    backward_path.append(('PAD', ''))
+                path = backward_path[:0:-1] + forward_path[1:]
+                assert len(path) == length * 4
+                embeddings_in_path = []
+                for t, name in path:
+                    if t == 'r':
+                        embeddings_in_path.append(r_embeddings[self.r2id[name]])
+                    elif t == 'e':
+                        embeddings_in_path.append(e_embeddings[self.e2id[name]])
+                    elif t == 'PAD':
+                        embeddings_in_path.append(torch.zeros((emb_dim,)))
+
+                batch.append(torch.stack(embeddings_in_path))
+            yield torch.stack(batch)
 
 
 def main():
+    from model import TransEModel
     kg = FB5KDataset.get_instance()
     filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
-    for tp in filtered_dataset.train_triplets[:10]:
-        forward_path, backward_path = FilteredFB5KDataset.sample_relational_path(tp[0], 2, filtered_dataset.train_head_to_triplets, filtered_dataset.train_tail_to_triplets)
-        print("FP", forward_path)
-        print("BP", backward_path)
+    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
+    trans_e_model.load('checkpoints/trans-e-10.pt')
+    e_embeddings = trans_e_model.e_embeddings.weight
+    r_embeddings = trans_e_model.r_embeddings.weight
+    generator = filtered_dataset.get_batch_generator(4, 50, e_embeddings, r_embeddings, 2)
+    batch = next(generator)
+    print(batch.shape)
 
 
 if __name__ == '__main__':
