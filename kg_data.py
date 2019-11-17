@@ -1,5 +1,5 @@
 import random
-from collections import Counter
+from collections import Counter, defaultdict
 
 import torch
 
@@ -146,10 +146,63 @@ class FilteredFB5KDataset:
         print('# Relation', len(relation_set))
         print('# Triplet', len(self.triplets))
 
+        # train-validation-test split
+        rnd = random.Random(42)
+        rnd.shuffle(self.triplets)
+        self.train_triplets = self.triplets[:int(0.8 * len(self.triplets))]
+        self.validation_triplets = self.triplets[int(0.8 * len(self.triplets)):]
+
+        # build index
+        self.train_head_to_triplets, self.train_tail_to_triplets = self._build_index(self.train_triplets)
+        self.validation_head_to_triplets, self.validation_tail_to_triplets = self._build_index(self.validation_triplets)
+
+    @staticmethod
+    def _build_index(triplets):
+        head_to_triplets = defaultdict(list)
+        tail_to_triplets = defaultdict(list)
+        for s, r, o in triplets:
+            head_to_triplets[s].append((s, r, o))
+            tail_to_triplets[o].append((s, r, o))
+        return head_to_triplets, tail_to_triplets
+
+    @staticmethod
+    def sample_relational_path(entity, length, head_to_triplets, tail_to_triplets):
+        forward_path = [('e', entity)]
+        backward_path = [('e', entity)]
+        for i in range(length):
+            triplets = head_to_triplets[forward_path[-1][1]]
+            if len(triplets) == 0:
+                break
+            next_triplet = random.choice(triplets)
+            forward_path.append(('r', next_triplet[1]))
+            forward_path.append(('e', next_triplet[2]))
+        for i in range(length):
+            triplets = tail_to_triplets[forward_path[-1][1]]
+            if len(triplets) == 0:
+                break
+            next_triplet = random.choice(triplets)
+            forward_path.append(('r', next_triplet[1]))
+            forward_path.append(('e', next_triplet[0]))
+        return forward_path, backward_path
+
+    def get_batch_generator(self, batch_size, e_embeddings, r_embeddings, length, shuffle=True):
+        all_triplets = self.train_triplets
+        # build index
+
+        if shuffle:
+            random.shuffle(all_triplets)
+        num_batches = (len(all_triplets) + batch_size - 1) // batch_size
+        for i in range(num_batches):
+            batch_triplets = all_triplets[i * batch_size: (i + 1) * batch_size]
+
 
 def main():
     kg = FB5KDataset.get_instance()
     filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
+    for tp in filtered_dataset.train_triplets[:10]:
+        forward_path, backward_path = FilteredFB5KDataset.sample_relational_path(tp[0], 2, filtered_dataset.train_head_to_triplets, filtered_dataset.train_tail_to_triplets)
+        print("FP", forward_path)
+        print("BP", backward_path)
 
 
 if __name__ == '__main__':
