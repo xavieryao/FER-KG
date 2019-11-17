@@ -186,7 +186,7 @@ class FilteredFB5KDataset:
             backward_path.append(('e', next_triplet[0]))
         return forward_path, backward_path
 
-    def get_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, length, shuffle=True):
+    def get_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length, shuffle=True):
         all_triplets = self.train_triplets
 
         if shuffle:
@@ -195,32 +195,38 @@ class FilteredFB5KDataset:
         for i in range(num_batches):
             batch_triplets = all_triplets[i * batch_size: (i + 1) * batch_size]
             entities_in_batch = []
-            batch = []
+            batch_X = []
+            batch_Y = []
             for s, _, o in batch_triplets:
                 entities_in_batch.append(s)
                 entities_in_batch.append(o)
             for entity in entities_in_batch:
-                forward_path, backward_path = self.sample_relational_path(entity, length, self.train_head_to_triplets,
-                                                                          self.train_tail_to_triplets)
-                for _ in range(length - (len(forward_path) - 1) // 2):
-                    forward_path.append(('PAD', ''))
-                    forward_path.append(('PAD', ''))
-                for _ in range(length - (len(backward_path) - 1) // 2):
-                    backward_path.append(('PAD', ''))
-                    backward_path.append(('PAD', ''))
-                path = backward_path[:0:-1] + forward_path[1:]
-                assert len(path) == length * 4
-                embeddings_in_path = []
-                for t, name in path:
-                    if t == 'r':
-                        embeddings_in_path.append(r_embeddings[self.r2id[name]])
-                    elif t == 'e':
-                        embeddings_in_path.append(e_embeddings[self.e2id[name]])
-                    elif t == 'PAD':
-                        embeddings_in_path.append(torch.zeros((emb_dim,)))
+                contexts = []
+                y_true = e_embeddings[self.e2id[entity]]
+                for _ in range(num_context):
+                    forward_path, backward_path = self.sample_relational_path(entity, length, self.train_head_to_triplets,
+                                                                              self.train_tail_to_triplets)
+                    for _ in range(length - (len(forward_path) - 1) // 2):
+                        forward_path.append(('PAD', ''))
+                        forward_path.append(('PAD', ''))
+                    for _ in range(length - (len(backward_path) - 1) // 2):
+                        backward_path.append(('PAD', ''))
+                        backward_path.append(('PAD', ''))
+                    path = backward_path[:0:-1] + forward_path[1:]
+                    assert len(path) == length * 4
+                    embeddings_in_path = []
+                    for t, name in path:
+                        if t == 'r':
+                            embeddings_in_path.append(r_embeddings[self.r2id[name]])
+                        elif t == 'e':
+                            embeddings_in_path.append(e_embeddings[self.e2id[name]])
+                        elif t == 'PAD':
+                            embeddings_in_path.append(torch.zeros((emb_dim,)))
 
-                batch.append(torch.stack(embeddings_in_path))
-            yield torch.stack(batch)
+                    contexts.append(torch.stack(embeddings_in_path))
+                batch_X.append(torch.stack(contexts))
+                batch_Y.append(y_true)
+            yield torch.stack(batch_X), torch.stack(batch_Y)
 
 
 def main():
@@ -231,9 +237,10 @@ def main():
     trans_e_model.load('checkpoints/trans-e-10.pt')
     e_embeddings = trans_e_model.e_embeddings.weight
     r_embeddings = trans_e_model.r_embeddings.weight
-    generator = filtered_dataset.get_batch_generator(4, 50, e_embeddings, r_embeddings, 2)
-    batch = next(generator)
-    print(batch.shape)
+    generator = filtered_dataset.get_batch_generator(1, 50, e_embeddings, r_embeddings, 3, 2)
+    batch_X, batch_Y = next(generator)
+    print(batch_X.shape)
+    print(batch_Y.shape)
 
 
 if __name__ == '__main__':
