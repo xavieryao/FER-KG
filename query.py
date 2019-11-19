@@ -21,7 +21,7 @@ def kg_completion(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
             hits += 1
         rank.append(ranking.index(o_true_idx))
 
-        print('hits', hits/n)
+        # print('hits', hits/n)
     return hits / len(triplets), sum(rank) / len(triplets)
 
 

@@ -87,7 +87,8 @@ def train(model: EmbRegressionModel):
     except FileExistsError:
         pass
 
-    for epoch in range(10):
+    steps = 0
+    for epoch in range(50):
         data_generator = filtered_dataset.get_train_batch_generator(
             batch_size=16,
             emb_dim=50,
@@ -97,7 +98,6 @@ def train(model: EmbRegressionModel):
             length=2
         )
         running_loss = 0.0
-        steps = 0
         for i, (batch_X, batch_Y) in enumerate(data_generator):
             steps += len(batch_X)
             optimizer.zero_grad()
@@ -111,8 +111,8 @@ def train(model: EmbRegressionModel):
             print('[%d, %5d]     loss: %.6f' %
                   (epoch + 1, i + 1, loss.item()))
 
-            TRAIN_REPORT_FREQ = 20
-            VAL_REPORT_FREQ = 50
+            TRAIN_REPORT_FREQ = 5
+            VAL_REPORT_FREQ = 20
             if i % TRAIN_REPORT_FREQ == TRAIN_REPORT_FREQ - 1:
                 print('[%d, %5d]     loss: %.6f' %
                       (epoch + 1, i + 1, running_loss / TRAIN_REPORT_FREQ))
@@ -125,7 +125,7 @@ def train(model: EmbRegressionModel):
                 val_loss = validate(model, valid_X, valid_Y)
                 print('[%d, %5d]     val loss: %.6f' %
                       (epoch + 1, i + 1, val_loss))
-                val_writer.add_scalar('val loss', val_loss)
+                val_writer.add_scalar('loss', val_loss, steps)
                 model.save(f"checkpoints/reg_{epoch+1}_{i+1}.pt")
 
 
@@ -153,7 +153,7 @@ def test(model):
     ))
 
     test_Ys = model(test_Xs)
-    new_e_embeddings = e_embeddings.detach().numpy()
+    new_e_embeddings = e_embeddings.detach().numpy().copy()
     for i, et in enumerate(test_entities):
         et_id = kg.e2id[et]
         new_e_embeddings[et_id] = test_Ys[i].detach().numpy()
@@ -165,11 +165,14 @@ def test(model):
     with open('output/e_embeddings.pkl', 'wb') as f:
         pickle.dump(new_e_embeddings, f)
 
+    print('predicted!')
     # evaluate kg completion
-    triplets = kg.valid_triplets
+    triplets = kg.valid_triplets[:100]
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
+    print("Hits@10", hits)
+    hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
     print("Hits@10", hits)
 
 

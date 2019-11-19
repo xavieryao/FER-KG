@@ -1,4 +1,5 @@
 import random
+random.seed(233)
 from collections import Counter, defaultdict
 
 import torch
