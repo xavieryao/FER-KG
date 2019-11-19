@@ -1,7 +1,13 @@
+import os
+
+import torch
 import torch.nn.functional as F
 from torch import nn
-import torch
-from model import SavableModel
+from torch.optim import Adam
+from torch.utils.tensorboard import SummaryWriter
+
+from kg_data import FB5KDataset, FilteredFB5KDataset
+from model import SavableModel, TransEModel
 
 
 class EmbRegressionModel(SavableModel):
@@ -13,12 +19,12 @@ class EmbRegressionModel(SavableModel):
         self.num_layers = num_layers
 
         self.context_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128)
-        self.context_encoder = nn.TransforerEncoder(self.context_encoder_layer, num_layers)
+        self.context_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers)
 
-        self.context_pool = nn.MaxPool1d(context_length)
+        self.context_pool = nn.MaxPool1d(context_length + 1)
 
         self.shot_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128)
-        self.shot_encoder = nn.TransforerEncoder(self.context_encoder_layer, num_layers)
+        self.shot_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers)
 
         self.output = nn.Linear(embed_dim * num_contexts, embed_dim)
 
@@ -43,3 +49,69 @@ class EmbRegressionModel(SavableModel):
 
         output = self.output(shot_encoding)
         return F.normalize(output, p=2, dim=-1)
+
+
+def train(model: EmbRegressionModel):
+    train_writer = SummaryWriter('runs/FSReg_train')
+    val_writer = SummaryWriter('runs/FSReg_val')
+
+    kg = FB5KDataset.get_instance()
+    filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
+    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
+    trans_e_model.load('checkpoints/trans-e-10.pt')
+    e_embeddings = trans_e_model.e_embeddings.weight
+    r_embeddings = trans_e_model.r_embeddings.weight
+
+    criterion = nn.L1Loss()
+    optimizer = Adam(model.parameters())
+
+    try:
+        os.mkdir('checkpoints')
+        os.mkdir('runs')
+    except FileExistsError:
+        pass
+
+    for epoch in range(10):
+        data_generator = filtered_dataset.get_batch_generator(
+            batch_size=16,
+            emb_dim=50,
+            e_embeddings=e_embeddings,
+            r_embeddings=r_embeddings,
+            num_context=4,
+            length=2
+        )
+        running_loss = 0.0
+        for i, (batch_X, batch_Y) in enumerate(data_generator):
+            optimizer.zero_grad()
+
+            Y_pred = model(batch_X)
+            loss = criterion(batch_Y, Y_pred)
+            loss.backward()
+            optimizer.step()
+
+            running_loss += loss.item()
+            if i % 100 == 99:
+                print('[%d, %5d]     loss: %.6f' %
+                      (epoch + 1, i + 1, running_loss / 100))
+                steps = 1  # FIXME
+                train_writer.add_scalar('epoch', epoch + 1, steps)
+                train_writer.add_scalar('loss', running_loss / 100, steps)
+
+                running_loss = 0.0
+
+            # TODO: validate
+            # TODO: save
+
+
+def main():
+    model = EmbRegressionModel(
+        embed_dim=50,
+        num_contexts=4,
+        context_length=4,
+        num_layers=1
+    )
+    train(model)
+
+
+if __name__ == '__main__':
+    main()

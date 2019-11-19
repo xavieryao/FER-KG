@@ -227,21 +227,3 @@ class FilteredFB5KDataset:
                 batch_X.append(torch.stack(contexts))
                 batch_Y.append(y_true)
             yield torch.stack(batch_X), torch.stack(batch_Y)
-
-
-def main():
-    from model import TransEModel
-    kg = FB5KDataset.get_instance()
-    filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
-    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
-    trans_e_model.load('checkpoints/trans-e-10.pt')
-    e_embeddings = trans_e_model.e_embeddings.weight
-    r_embeddings = trans_e_model.r_embeddings.weight
-    generator = filtered_dataset.get_batch_generator(1, 50, e_embeddings, r_embeddings, 3, 2)
-    batch_X, batch_Y = next(generator)
-    print(batch_X.shape)
-    print(batch_Y.shape)
-
-
-if __name__ == '__main__':
-    main()
