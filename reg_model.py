@@ -51,6 +51,12 @@ class EmbRegressionModel(SavableModel):
         return F.normalize(output, p=2, dim=-1)
 
 
+def validate(model: EmbRegressionModel, xs, ys_true):
+    criterion = nn.L1Loss()
+    ys_pred = model(xs)
+    return criterion(ys_pred, ys_true)
+
+
 def train(model: EmbRegressionModel):
     train_writer = SummaryWriter('runs/FSReg_train')
     val_writer = SummaryWriter('runs/FSReg_val')
@@ -61,6 +67,14 @@ def train(model: EmbRegressionModel):
     trans_e_model.load('checkpoints/trans-e-10.pt')
     e_embeddings = trans_e_model.e_embeddings.weight
     r_embeddings = trans_e_model.r_embeddings.weight
+
+    valid_X, valid_Y = filtered_dataset.get_valid_data(
+        emb_dim=50,
+        e_embeddings=e_embeddings,
+        r_embeddings=r_embeddings,
+        num_context=4,
+        length=2
+    )
 
     criterion = nn.L1Loss()
     optimizer = Adam(model.parameters())
@@ -81,7 +95,9 @@ def train(model: EmbRegressionModel):
             length=2
         )
         running_loss = 0.0
+        steps = 0
         for i, (batch_X, batch_Y) in enumerate(data_generator):
+            steps += len(batch_X)
             optimizer.zero_grad()
 
             Y_pred = model(batch_X)
@@ -98,16 +114,17 @@ def train(model: EmbRegressionModel):
             if i % TRAIN_REPORT_FREQ == TRAIN_REPORT_FREQ - 1:
                 print('[%d, %5d]     loss: %.6f' %
                       (epoch + 1, i + 1, running_loss / TRAIN_REPORT_FREQ))
-                steps = 1  # FIXME
                 train_writer.add_scalar('epoch', epoch + 1, steps)
                 train_writer.add_scalar('loss', running_loss / TRAIN_REPORT_FREQ, steps)
 
                 running_loss = 0.0
 
             if i % VAL_REPORT_FREQ == VAL_REPORT_FREQ - 1:
-                # TODO: validate
-                # TODO: save
-                pass
+                val_loss = validate(model, valid_X, valid_Y)
+                print('[%d, %5d]     val loss: %.6f' %
+                      (epoch + 1, i + 1, val_loss))
+                val_writer.add_scalar('val loss', val_loss)
+                model.save(f"checkpoints/reg_{epoch+1}_{i+1}.pt")
 
 
 def main():
