@@ -210,7 +210,7 @@ class FilteredFB5KDataset:
             batch_Y = []
             for entity in entities_in_batch:
                 contexts = []
-                y_true = e_embeddings[self.e2id[entity]]
+                y_true = torch.Tensor(e_embeddings[self.e2id[entity]])
                 for _ in range(num_context):
                     forward_path, backward_path = self.sample_relational_path(entity, length, rnd)
                     for _ in range(length - (len(forward_path) - 1) // 2):
@@ -224,9 +224,9 @@ class FilteredFB5KDataset:
                     embeddings_in_path = []
                     for t, name in path:
                         if t == 'r':
-                            embeddings_in_path.append(r_embeddings[self.r2id[name]])
+                            embeddings_in_path.append(torch.Tensor(r_embeddings[self.r2id[name]]))
                         elif t == 'e':
-                            embeddings_in_path.append(e_embeddings[self.e2id[name]])
+                            embeddings_in_path.append(torch.Tensor(e_embeddings[self.e2id[name]]))
                         elif t == 'PAD':
                             embeddings_in_path.append(torch.zeros((emb_dim,)))
 

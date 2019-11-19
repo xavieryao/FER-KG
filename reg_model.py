@@ -67,8 +67,8 @@ def train(model: EmbRegressionModel):
     filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
     trans_e_model.load('checkpoints/trans-e-10.pt')
-    e_embeddings = trans_e_model.e_embeddings.weight
-    r_embeddings = trans_e_model.r_embeddings.weight
+    e_embeddings = trans_e_model.export_entity_embeddings()
+    r_embeddings = trans_e_model.export_relation_embeddings()
 
     valid_X, valid_Y = filtered_dataset.get_valid_data(
         emb_dim=50,
@@ -88,7 +88,7 @@ def train(model: EmbRegressionModel):
         pass
 
     steps = 0
-    for epoch in range(50):
+    for epoch in range(100):
         data_generator = filtered_dataset.get_train_batch_generator(
             batch_size=16,
             emb_dim=50,
@@ -108,11 +108,9 @@ def train(model: EmbRegressionModel):
             optimizer.step()
 
             running_loss += loss.item()
-            print('[%d, %5d]     loss: %.6f' %
-                  (epoch + 1, i + 1, loss.item()))
 
-            TRAIN_REPORT_FREQ = 5
-            VAL_REPORT_FREQ = 20
+            TRAIN_REPORT_FREQ = 30
+            VAL_REPORT_FREQ = 100
             if i % TRAIN_REPORT_FREQ == TRAIN_REPORT_FREQ - 1:
                 print('[%d, %5d]     loss: %.6f' %
                       (epoch + 1, i + 1, running_loss / TRAIN_REPORT_FREQ))
@@ -138,8 +136,8 @@ def test(model):
     test_entities = list(set(x[0] for x in test_ds.entities) - set(x[0] for x in train_ds.entities))
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
     trans_e_model.load('checkpoints/trans-e-10.pt')
-    e_embeddings = trans_e_model.e_embeddings.weight
-    r_embeddings = trans_e_model.r_embeddings.weight
+    e_embeddings = trans_e_model.export_entity_embeddings()
+    r_embeddings = trans_e_model.export_relation_embeddings()
 
     test_Xs, _ = next(test_ds.get_batch_generator(
         entities=test_entities,
@@ -153,7 +151,7 @@ def test(model):
     ))
 
     test_Ys = model(test_Xs)
-    new_e_embeddings = e_embeddings.detach().numpy().copy()
+    new_e_embeddings = e_embeddings.copy()
     for i, et in enumerate(test_entities):
         et_id = kg.e2id[et]
         new_e_embeddings[et_id] = test_Ys[i].detach().numpy()
@@ -167,7 +165,7 @@ def test(model):
 
     print('predicted!')
     # evaluate kg completion
-    triplets = kg.valid_triplets[:100]
+    triplets = kg.valid_triplets[:500]
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
