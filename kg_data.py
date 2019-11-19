@@ -140,10 +140,7 @@ class FilteredFB5KDataset:
         entity_set = set(x[0] for x in self.entities)
         relation_set = set(x[0] for x in self.relations)
 
-        self.triplets = []
-        for s, r, o in kg.triplets:
-            if s in entity_set and r in relation_set and o in entity_set:
-                self.triplets.append((s, r, o))
+        self.triplets = kg.triplets
         print('# Entity', len(entity_set))
         print('# Relation', len(relation_set))
         print('# Triplet', len(self.triplets))

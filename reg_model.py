@@ -20,13 +20,15 @@ class EmbRegressionModel(SavableModel):
         self.context_length = context_length
         self.num_layers = num_layers
 
-        self.context_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128)
-        self.context_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers)
+        self.context_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128, dropout=0.25)
+        self.context_encoder_layer_norm = nn.LayerNorm([embed_dim])
+        self.context_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers, norm=self.context_encoder_layer_norm)
 
         self.context_pool = nn.MaxPool1d(context_length + 1)
 
-        self.shot_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128)
-        self.shot_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers)
+        self.shot_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=2, dim_feedforward=128, dropout=0.25)
+        self.shot_encoder_layer_norm = nn.LayerNorm([embed_dim])
+        self.shot_encoder = nn.TransformerEncoder(self.context_encoder_layer, num_layers, norm=self.shot_encoder_layer_norm)
 
         self.output = nn.Linear(embed_dim * num_contexts, embed_dim)
 
@@ -41,7 +43,7 @@ class EmbRegressionModel(SavableModel):
             ctx = x[:, c].transpose(0, 1)  # L x B x N
             ctx: torch.Tensor = self.context_encoder(ctx)  # L x B x N
             ctx = ctx.permute(1, 2, 0)  # B x N x L
-            ctx = self.context_pool(ctx).squeeze()  # B x N x 1
+            ctx = self.context_pool(ctx).squeeze()  # B x N
             context_encodings.append(ctx)
         context_encodings = torch.stack(context_encodings)  # C x B x N
 
@@ -88,7 +90,7 @@ def train(model: EmbRegressionModel):
         pass
 
     steps = 0
-    for epoch in range(100):
+    for epoch in range(300):
         data_generator = filtered_dataset.get_train_batch_generator(
             batch_size=16,
             emb_dim=50,
@@ -118,13 +120,12 @@ def train(model: EmbRegressionModel):
                 train_writer.add_scalar('loss', running_loss / TRAIN_REPORT_FREQ, steps)
 
                 running_loss = 0.0
-
-            if i % VAL_REPORT_FREQ == VAL_REPORT_FREQ - 1:
-                val_loss = validate(model, valid_X, valid_Y)
-                print('[%d, %5d]     val loss: %.6f' %
-                      (epoch + 1, i + 1, val_loss))
-                val_writer.add_scalar('loss', val_loss, steps)
-                model.save(f"checkpoints/reg_{epoch+1}_{i+1}.pt")
+        # validate after each epoch
+        val_loss = validate(model, valid_X, valid_Y)
+        print('[%d]     val loss: %.6f' %
+              (epoch + 1,  val_loss))
+        val_writer.add_scalar('loss', val_loss, steps)
+        model.save(f"checkpoints/reg_{epoch+1}.pt")
 
 
 def test(model):
