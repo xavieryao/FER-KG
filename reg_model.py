@@ -1,4 +1,5 @@
 import os
+import random
 
 import torch
 import torch.nn.functional as F
@@ -8,6 +9,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from kg_data import FB5KDataset, FilteredFB5KDataset
 from model import SavableModel, TransEModel
+from query import kg_completion
 
 
 class EmbRegressionModel(SavableModel):
@@ -162,6 +164,13 @@ def test(model):
         pass
     with open('output/e_embeddings.pkl', 'wb') as f:
         pickle.dump(new_e_embeddings, f)
+
+    # evaluate kg completion
+    triplets = kg.valid_triplets
+    triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
+
+    hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
+    print("Hits@10", hits)
 
 
 def main():
