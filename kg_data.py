@@ -186,16 +186,16 @@ class FilteredFB5KDataset:
             backward_path.append(('e', next_triplet[0]))
         return forward_path, backward_path
 
-    def get_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length, shuffle=True):
-        return self._get_batch_generator(self.train_entities, batch_size, emb_dim, e_embeddings, r_embeddings,
+    def get_train_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length, shuffle=True):
+        return self.get_batch_generator(self.train_entities, batch_size, emb_dim, e_embeddings, r_embeddings,
                                          num_context, length, shuffle)
 
     def get_valid_data(self, emb_dim, e_embeddings, r_embeddings, num_context, length):
         return next(
-            self._get_batch_generator(self.validation_entities, len(self.validation_entities), emb_dim, e_embeddings,
+            self.get_batch_generator(self.validation_entities, len(self.validation_entities), emb_dim, e_embeddings,
                                       r_embeddings, num_context, length, shuffle=False))
 
-    def _get_batch_generator(self, entities, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length,
+    def get_batch_generator(self, entities, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length,
                              shuffle=True):
         if shuffle:
             random.shuffle(entities)

@@ -86,7 +86,7 @@ def train(model: EmbRegressionModel):
         pass
 
     for epoch in range(10):
-        data_generator = filtered_dataset.get_batch_generator(
+        data_generator = filtered_dataset.get_train_batch_generator(
             batch_size=16,
             emb_dim=50,
             e_embeddings=e_embeddings,
@@ -127,14 +127,56 @@ def train(model: EmbRegressionModel):
                 model.save(f"checkpoints/reg_{epoch+1}_{i+1}.pt")
 
 
+def test(model):
+    import pickle
+
+    kg = FB5KDataset.get_instance()
+    train_ds = FilteredFB5KDataset(kg, min_entity_freq=0.8, min_relation_freq=0.5)
+    test_ds = FilteredFB5KDataset(kg)
+    test_entities = list(set(x[0] for x in test_ds.entities) - set(x[0] for x in train_ds.entities))
+    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
+    trans_e_model.load('checkpoints/trans-e-10.pt')
+    e_embeddings = trans_e_model.e_embeddings.weight
+    r_embeddings = trans_e_model.r_embeddings.weight
+
+    test_Xs, _ = next(test_ds.get_batch_generator(
+        entities=test_entities,
+        batch_size=len(test_entities),
+        emb_dim=50,
+        e_embeddings=e_embeddings,
+        r_embeddings=r_embeddings,
+        num_context=4,
+        length=2,
+        shuffle=False
+    ))
+
+    test_Ys = model(test_Xs)
+    new_e_embeddings = e_embeddings.detach().numpy()
+    for i, et in enumerate(test_entities):
+        et_id = kg.e2id[et]
+        new_e_embeddings[et_id] = test_Ys[i].detach().numpy()
+
+    try:
+        os.mkdir('output')
+    except FileExistsError:
+        pass
+    with open('output/e_embeddings.pkl', 'wb') as f:
+        pickle.dump(new_e_embeddings, f)
+
+
 def main():
+    import sys
     model = EmbRegressionModel(
         embed_dim=50,
         num_contexts=4,
         context_length=4,
         num_layers=1
     )
-    train(model)
+    if sys.argv[1] == 'train':
+        train(model)
+    elif sys.argv[1] == 'test':
+        model.load(sys.argv[2])
+        test(model)
 
 
 if __name__ == '__main__':

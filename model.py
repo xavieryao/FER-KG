@@ -84,7 +84,7 @@ def train(model: SavableModel):
 
     best_val_score = float('+inf')
     for epoch in range(10):
-        data_generator = dataset.get_batch_generator(batch_size=16)
+        data_generator = dataset.get_train_batch_generator(batch_size=16)
         running_loss = 0.0
         running_score = 0.0
         for i, (pos_triplets, neg_triplets) in enumerate(data_generator):
