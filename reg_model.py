@@ -90,17 +90,24 @@ def train(model: EmbRegressionModel):
             optimizer.step()
 
             running_loss += loss.item()
-            if i % 100 == 99:
+            print('[%d, %5d]     loss: %.6f' %
+                  (epoch + 1, i + 1, loss.item()))
+
+            TRAIN_REPORT_FREQ = 20
+            VAL_REPORT_FREQ = 50
+            if i % TRAIN_REPORT_FREQ == TRAIN_REPORT_FREQ - 1:
                 print('[%d, %5d]     loss: %.6f' %
-                      (epoch + 1, i + 1, running_loss / 100))
+                      (epoch + 1, i + 1, running_loss / TRAIN_REPORT_FREQ))
                 steps = 1  # FIXME
                 train_writer.add_scalar('epoch', epoch + 1, steps)
-                train_writer.add_scalar('loss', running_loss / 100, steps)
+                train_writer.add_scalar('loss', running_loss / TRAIN_REPORT_FREQ, steps)
 
                 running_loss = 0.0
 
-            # TODO: validate
-            # TODO: save
+            if i % VAL_REPORT_FREQ == VAL_REPORT_FREQ - 1:
+                # TODO: validate
+                # TODO: save
+                pass
 
 
 def main():

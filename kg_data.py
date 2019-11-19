@@ -187,8 +187,16 @@ class FilteredFB5KDataset:
         return forward_path, backward_path
 
     def get_batch_generator(self, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length, shuffle=True):
-        all_triplets = self.train_triplets
+        return self._get_batch_generator(self.train_triplets, batch_size, emb_dim, e_embeddings, r_embeddings,
+                                         num_context, length, shuffle)
 
+    def get_valid_data(self, emb_dim, e_embeddings, r_embeddings, num_context, length):
+        return next(
+            self._get_batch_generator(self.validation_triplets, len(self.validation_triplets), emb_dim, e_embeddings,
+                                      r_embeddings, num_context, length, shuffle=False))
+
+    def _get_batch_generator(self, all_triplets, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length,
+                             shuffle=True):
         if shuffle:
             random.shuffle(all_triplets)
         num_batches = (len(all_triplets) + batch_size - 1) // batch_size
@@ -204,7 +212,8 @@ class FilteredFB5KDataset:
                 contexts = []
                 y_true = e_embeddings[self.e2id[entity]]
                 for _ in range(num_context):
-                    forward_path, backward_path = self.sample_relational_path(entity, length, self.train_head_to_triplets,
+                    forward_path, backward_path = self.sample_relational_path(entity, length,
+                                                                              self.train_head_to_triplets,
                                                                               self.train_tail_to_triplets)
                     for _ in range(length - (len(forward_path) - 1) // 2):
                         forward_path.append(('PAD', ''))
