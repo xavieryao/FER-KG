@@ -28,7 +28,7 @@ class MarginRankingLoss(nn.Module):
 
     def forward(self, pos_scores, neg_scores):
         dist = self.margin + pos_scores - neg_scores
-        return torch.mean(torch.max(torch.zeros((0,), device=device), dist))
+        return torch.mean(torch.max(torch.zeros((1,), device=device), dist))
 
 
 class TransEModel(SavableModel):

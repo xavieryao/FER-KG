@@ -1,0 +1,20 @@
+[
+    {
+        "name": "base",
+        "embed_dim": 50,
+        "num_context": 4,
+        "length": 2,
+        "batch_size": 128,
+        "layers": 1,
+        "min_entity_freq": 0.6,
+        "nhead": 2,
+        "dim_feedforward": 128,
+        "dropout": 0.25,
+        "trans-e-model": "checkpoints/trans-e-bak/trans-e-best.pt"
+    },
+    {
+        "name": "6ctx",
+        "parent": "base",
+        "num_context": 6
+    }
+]
