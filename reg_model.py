@@ -11,6 +11,8 @@ from kg_data import FB5KDataset, FilteredFB5KDataset
 from model import SavableModel, TransEModel
 from query import kg_completion
 
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class EmbRegressionModel(SavableModel):
     def __init__(self, embed_dim, num_contexts, context_length, num_layers):
@@ -56,9 +58,11 @@ class EmbRegressionModel(SavableModel):
 
 
 def validate(model: EmbRegressionModel, xs, ys_true):
-    criterion = nn.L1Loss()
+    xs = xs.to(device)
+    ys_true = ys_true.to(device)
+    criterion = nn.L1Loss().to(device)
     ys_pred = model(xs)
-    return criterion(ys_pred, ys_true)
+    return criterion(ys_pred, ys_true).cpu()
 
 
 def train(model: EmbRegressionModel):
@@ -80,7 +84,7 @@ def train(model: EmbRegressionModel):
         length=2
     )
 
-    criterion = nn.L1Loss()
+    criterion = nn.L1Loss().to(device)
     optimizer = Adam(model.parameters())
 
     try:
@@ -90,9 +94,10 @@ def train(model: EmbRegressionModel):
         pass
 
     steps = 0
-    for epoch in range(300):
+    best_val_loss = float('+inf')
+    for epoch in range(3000):
         data_generator = filtered_dataset.get_train_batch_generator(
-            batch_size=16,
+            batch_size=128,
             emb_dim=50,
             e_embeddings=e_embeddings,
             r_embeddings=r_embeddings,
@@ -101,6 +106,9 @@ def train(model: EmbRegressionModel):
         )
         running_loss = 0.0
         for i, (batch_X, batch_Y) in enumerate(data_generator):
+            batch_X = batch_X.to(device)
+            batch_Y = batch_Y.to(device)
+
             steps += len(batch_X)
             optimizer.zero_grad()
 
@@ -109,9 +117,9 @@ def train(model: EmbRegressionModel):
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
+            running_loss += loss.cpu().item()
 
-            TRAIN_REPORT_FREQ = 30
+            TRAIN_REPORT_FREQ = 5
             VAL_REPORT_FREQ = 100
             if i % TRAIN_REPORT_FREQ == TRAIN_REPORT_FREQ - 1:
                 print('[%d, %5d]     loss: %.6f' %
@@ -125,7 +133,11 @@ def train(model: EmbRegressionModel):
         print('[%d]     val loss: %.6f' %
               (epoch + 1,  val_loss))
         val_writer.add_scalar('loss', val_loss, steps)
-        model.save(f"checkpoints/reg_{epoch+1}.pt")
+
+        model.save(f"checkpoints/reg_last.pt")
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            model.save(f"checkpoints/reg_best.pt")
 
 
 def test(model):
@@ -136,7 +148,7 @@ def test(model):
     test_ds = FilteredFB5KDataset(kg)
     test_entities = list(set(x[0] for x in test_ds.entities) - set(x[0] for x in train_ds.entities))
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), 50)
-    trans_e_model.load('checkpoints/trans-e-10.pt')
+    trans_e_model.load('checkpoints/trans-e-best.pt')
     e_embeddings = trans_e_model.export_entity_embeddings()
     r_embeddings = trans_e_model.export_relation_embeddings()
 
@@ -151,11 +163,11 @@ def test(model):
         shuffle=False
     ))
 
-    test_Ys = model(test_Xs)
+    test_Ys = model(test_Xs.to(device)).detach().cpu().numpy()
     new_e_embeddings = e_embeddings.copy()
     for i, et in enumerate(test_entities):
         et_id = kg.e2id[et]
-        new_e_embeddings[et_id] = test_Ys[i].detach().numpy()
+        new_e_embeddings[et_id] = test_Ys[i]
 
     try:
         os.mkdir('output')
@@ -183,6 +195,7 @@ def main():
         context_length=4,
         num_layers=1
     )
+    model = model.to(device)
     if sys.argv[1] == 'train':
         train(model)
     elif sys.argv[1] == 'test':

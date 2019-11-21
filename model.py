@@ -7,6 +7,7 @@ from torch.optim import Adam, SGD
 from torch.utils.tensorboard import SummaryWriter
 
 from kg_data import FB5KDataset
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
 class SavableModel(nn.Module):
@@ -27,7 +28,7 @@ class MarginRankingLoss(nn.Module):
 
     def forward(self, pos_scores, neg_scores):
         dist = self.margin + pos_scores - neg_scores
-        return torch.mean(torch.max(torch.Tensor([0]), dist))
+        return torch.mean(torch.max(torch.zeros((0,), device=device), dist))
 
 
 class TransEModel(SavableModel):
@@ -44,8 +45,8 @@ class TransEModel(SavableModel):
         nn.init.xavier_uniform_(self.r_embeddings.weight)
 
     def forward(self, batch):
-        s, o = self.e_embeddings(batch['s']), self.e_embeddings(batch['o'])
-        r = self.r_embeddings(batch['r'])
+        s, o = self.e_embeddings(batch['s'].to(device)), self.e_embeddings(batch['o'].to(device))
+        r = self.r_embeddings(batch['r'].to(device))
 
         s, r, o = [F.normalize(x, p=2, dim=-1) for x in (s, r, o)]
         return torch.norm(s + r - o, p=1, dim=-1)
@@ -63,7 +64,7 @@ def validate(model: nn.Module):
     dataset = FB5KDataset.get_instance()
     batch = dataset.convert_triplets_to_batch(dataset.valid_triplets)
     scores = model(batch)
-    score = torch.mean(scores).item()
+    score = torch.mean(scores).cpu().item()
     return score
 
 
@@ -83,8 +84,8 @@ def train(model: SavableModel):
         pass
 
     best_val_score = float('+inf')
-    for epoch in range(10):
-        data_generator = dataset.get_train_batch_generator(batch_size=16)
+    for epoch in range(1000):
+        data_generator = dataset.get_batch_generator(batch_size=128)
         running_loss = 0.0
         running_score = 0.0
         for i, (pos_triplets, neg_triplets) in enumerate(data_generator):
@@ -101,8 +102,8 @@ def train(model: SavableModel):
             loss.backward()
             optimizer.step()
 
-            running_loss += loss.item()
-            running_score += torch.mean(pos_scores).item()
+            running_loss += loss.cpu().item()
+            running_score += torch.mean(pos_scores).cpu().item()
             if i % 100 == 99:
                 print('[%d, %5d]     loss: %.6f     score: %.6f' %
                       (epoch + 1, i + 1, running_loss / 100, running_score / 100))
@@ -130,6 +131,7 @@ if __name__ == '__main__':
     def main():
         dataset = FB5KDataset.get_instance()
         model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=50)
+        model = model.to(device)
         train(model)
 
 

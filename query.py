@@ -33,8 +33,7 @@ def eval_kg_completion(checkpoint):
     e_embeddings = model.export_entity_embeddings()
     r_embeddings = model.export_relation_embeddings()
 
-    triplets = kg.valid_triplets
-    random.shuffle(triplets)
+    triplets = kg.valid_triplets[:500]
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
     hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
