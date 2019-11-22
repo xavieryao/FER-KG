@@ -38,5 +38,10 @@
         "layers": 3,
         "dropout": 0.6,
         "nhead": 2
+    },
+    {
+        "name": "pos_enc",
+        "parent": "more-td",
+        "positional_encoding": true
     }
 ]

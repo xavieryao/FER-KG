@@ -1,6 +1,7 @@
 import os
 import random
 import sys
+import math
 
 import torch
 import torch.nn.functional as F
@@ -16,13 +17,44 @@ from config import load_config
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
 
+class PositionalEncoding(nn.Module):
+    def __init__(self, d_model, seq_len = 10):
+        super().__init__()
+        self.d_model = d_model
+        self.seq_len = seq_len * 2
+        
+        # create constant 'pe' matrix with values dependant on 
+        # pos and i
+        pe = torch.zeros(self.seq_len, d_model, device=device, requires_grad=False)
+        for pos in range(self.seq_len):
+            for i in range(0, d_model, 2):
+                pe[pos, i] = \
+                math.sin(pos / (10000 ** ((2 * i)/d_model)))
+                pe[pos, i + 1] = \
+                math.cos(pos / (10000 ** ((2 * (i + 1))/d_model)))
+                
+        pe = pe.unsqueeze(0)
+        self.register_buffer('pe', pe)
+ 
+    
+    def forward(self, x):
+        # make embeddings relatively larger
+        x = x * math.sqrt(self.d_model)
+        #add constant to embedding
+        x = x + self.pe[:,:self.seq_len]
+        return x
+
+
 class EmbRegressionModel(SavableModel):
     def __init__(self, embed_dim, num_contexts, context_length, num_layers):
         super().__init__()
+
         self.embed_dim = embed_dim
         self.num_contexts = num_contexts
         self.context_length = context_length
         self.num_layers = num_layers
+
+        self.positional_encoding = PositionalEncoding(self.embed_dim, self.context_length)
 
         self.context_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=config['nhead'], dim_feedforward=config['dim_feedforward'], dropout=config['dropout'])
         self.context_encoder_layer_norm = nn.LayerNorm([embed_dim])
@@ -41,10 +73,14 @@ class EmbRegressionModel(SavableModel):
         # Output: N x L
         batch_size, num_contexts, context_length, num_embeddings = x.shape
 
+        if config['positional_encoding']:
+            x = self.positional_encoding(x)
+
         # context encoding
         context_encodings = []
         for c in range(num_contexts):
             ctx = x[:, c].transpose(0, 1)  # L x B x N
+
             ctx: torch.Tensor = self.context_encoder(ctx)  # L x B x N
             ctx = ctx.permute(1, 2, 0)  # B x N x L
             ctx = self.context_pool(ctx).squeeze()  # B x N
@@ -157,15 +193,16 @@ def train(model: EmbRegressionModel):
                 model.save(f"checkpoints/reg_{config['name']}_best_mean_rank.pt")
 
 
-
-def test(model, filtered_dataset, save=False, baseline=False, top=500):
+def external_val():
+    pass
+def external_eval(model, entities, text_Xs, triplets):
 
     kg = FB5KDataset.get_instance()
-    test_entities = list(set(kg.e2id.keys()) - set(x[0] for x in filtered_dataset.entities))
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), config['embed_dim'])
     trans_e_model.load(config['trans-e-model'])
     e_embeddings = trans_e_model.export_entity_embeddings()
     r_embeddings = trans_e_model.export_relation_embeddings()
+    """
 
     test_Xs, _ = next(filtered_dataset.get_batch_generator(
         entities=test_entities,
@@ -177,6 +214,7 @@ def test(model, filtered_dataset, save=False, baseline=False, top=500):
         length=config['length'],
         shuffle=False
     ))
+    """
 
     test_Ys = model(test_Xs.to(device)).detach().cpu().numpy()
     new_e_embeddings = e_embeddings.copy()
@@ -184,26 +222,12 @@ def test(model, filtered_dataset, save=False, baseline=False, top=500):
         et_id = kg.e2id[et]
         new_e_embeddings[et_id] = test_Ys[i]
 
-    if save:
-        import pickle
-        try:
-            os.mkdir('output')
-        except FileExistsError:
-            pass
-        with open('output/e_embeddings.pkl', 'wb') as f:
-            pickle.dump(new_e_embeddings, f)
-
     print('predicted!')
     # evaluate kg completion
-    triplets = filtered_dataset.low_freq_triplets[:top]
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
-    if baseline:
-        hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
-        print("Baseline Hits@10", hits)
-
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
-    print("Hits@10", hits)
+    print("Hits@10", hits[0], "meanRank", hits[1])
     return hits
 
 

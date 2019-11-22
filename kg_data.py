@@ -240,9 +240,9 @@ class FilteredFB5KDataset:
                     embeddings_in_path = []
                     for t, name in path:
                         if t == 'r':
-                            embeddings_in_path.append(torch.Tensor(r_embeddings[self.r2id[name]]))
+                            embeddings_in_path.append(torch.Tensor(r_embeddings[self.r2id.get(name, self.r2id['<UNK>'])]))
                         elif t == 'e':
-                            embeddings_in_path.append(torch.Tensor(e_embeddings[self.e2id[name]]))
+                            embeddings_in_path.append(torch.Tensor(e_embeddings[self.e2id.get(name, self.e2id['<UNK>'])]))
                         elif t == 'PAD':
                             embeddings_in_path.append(torch.zeros((emb_dim,)))
 
