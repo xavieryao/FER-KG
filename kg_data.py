@@ -158,6 +158,13 @@ class FilteredFB5KDataset:
         self.train_entities = [x[0] for x in self.entities[:int(0.8 * len(self.entities))]]
         self.validation_entities = [x[0] for x in self.entities[int(0.8 * len(self.entities)):]]
 
+        # test entities
+        test_entity_set = set()
+        for s, _, o in kg.test_triplets:
+            test_entity_set.add(s)
+            test_entity_set.add(o)
+        self.test_entities = list(test_entity_set)
+
         # build index
         self.head_to_triplets, self.tail_to_triplets = self._build_index(self.triplets)
 
@@ -198,6 +205,11 @@ class FilteredFB5KDataset:
     def get_valid_data(self, emb_dim, e_embeddings, r_embeddings, num_context, length):
         return next(
             self.get_batch_generator(self.validation_entities, len(self.validation_entities), emb_dim, e_embeddings,
+                                      r_embeddings, num_context, length, shuffle=False))
+
+    def get_test_data(self, emb_dim, e_embeddings, r_embeddings, num_context, length):
+        return next(
+            self.get_batch_generator(self.test_entities, len(self.test_entities), emb_dim, e_embeddings,
                                       r_embeddings, num_context, length, shuffle=False))
 
     def get_batch_generator(self, entities, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length,
