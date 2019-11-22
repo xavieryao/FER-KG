@@ -31,5 +31,12 @@
         "name": "long-ctx",
         "parent": "more-td",
         "length": 3
+    },
+    {
+        "name": "large",
+        "parent": "more-td",
+        "layers": 3,
+        "dropout": 0.6,
+        "nhead": 2
     }
 ]
