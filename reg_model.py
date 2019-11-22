@@ -97,6 +97,8 @@ def train(model: EmbRegressionModel):
 
     steps = 0
     best_val_loss = float('+inf')
+    best_hits = 0
+    best_mean_rank = float('+inf')
     for epoch in range(30000):
         data_generator = filtered_dataset.get_train_batch_generator(
             batch_size=config['batch_size'],
@@ -140,21 +142,32 @@ def train(model: EmbRegressionModel):
         if val_loss < best_val_loss:
             best_val_loss = val_loss
             model.save(f"checkpoints/reg_{config['name']}_best.pt")
+        
+
+        if epoch % 10 == 9:
+            hits, m_rk = test(model, filtered_dataset)
+            val_writer.add_scalar('hits', hits, steps)
+            val_writer.add_scalar('mean_rank', m_rk, steps)
+
+            if hits > best_hits:
+                best_hits = hits
+                model.save(f"checkpoints/reg_{config['name']}_best_hits.pt")
+            if m_rk < best_mean_rank:
+                best_mean_rank = m_rk
+                model.save(f"checkpoints/reg_{config['name']}_best_mean_rank.pt")
 
 
-def test(model):
-    import pickle
+
+def test(model, filtered_dataset, save=False, baseline=False, top=500):
 
     kg = FB5KDataset.get_instance()
-    train_ds = FilteredFB5KDataset(kg, min_entity_freq=config['min_entity_freq'], min_relation_freq=0.5)
-    test_ds = FilteredFB5KDataset(kg)
-    test_entities = list(set(x[0] for x in test_ds.entities) - set(x[0] for x in train_ds.entities))
+    test_entities = list(set(kg.e2id.keys()) - set(x[0] for x in filtered_dataset.entities))
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), config['embed_dim'])
     trans_e_model.load(config['trans-e-model'])
     e_embeddings = trans_e_model.export_entity_embeddings()
     r_embeddings = trans_e_model.export_relation_embeddings()
 
-    test_Xs, _ = next(test_ds.get_batch_generator(
+    test_Xs, _ = next(filtered_dataset.get_batch_generator(
         entities=test_entities,
         batch_size=len(test_entities),
         emb_dim=config['embed_dim'],
@@ -171,22 +184,27 @@ def test(model):
         et_id = kg.e2id[et]
         new_e_embeddings[et_id] = test_Ys[i]
 
-    try:
-        os.mkdir('output')
-    except FileExistsError:
-        pass
-    with open('output/e_embeddings.pkl', 'wb') as f:
-        pickle.dump(new_e_embeddings, f)
+    if save:
+        import pickle
+        try:
+            os.mkdir('output')
+        except FileExistsError:
+            pass
+        with open('output/e_embeddings.pkl', 'wb') as f:
+            pickle.dump(new_e_embeddings, f)
 
     print('predicted!')
     # evaluate kg completion
-    triplets = kg.valid_triplets[:500]
+    triplets = filtered_dataset.low_freq_triplets[:top]
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
+
+    if baseline:
+        hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
+        print("Baseline Hits@10", hits)
 
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
     print("Hits@10", hits)
-    hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
-    print("Hits@10", hits)
+    return hits
 
 
 def main():
@@ -201,7 +219,9 @@ def main():
         train(model)
     elif sys.argv[1] == 'test':
         model.load(sys.argv[3])
-        test(model)
+        kg = FB5KDataset.get_instance()
+        filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=config['min_entity_freq'], min_relation_freq=0.5)
+        test(model, filtered_dataset, baseline=True, top=None)
 
 
 if __name__ == '__main__':

@@ -5,7 +5,10 @@ import torch
 from tqdm import tqdm
 
 
+
 def kg_completion(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
+    e_embeddings = torch.Tensor(e_embeddings)
+    r_embeddings = torch.Tensor(r_embeddings)
     hits = 0
     n = 0
     rank = []
@@ -14,7 +17,7 @@ def kg_completion(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
         s_vec = torch.Tensor(e_embeddings[kg.e2id.get(s, kg.e2id['<UNK>'])])
         r_vec = torch.Tensor(r_embeddings[kg.r2id.get(r, kg.r2id['<UNK>'])])
         o_true_idx = kg.e2id.get(o_true, kg.e2id['<UNK>'])
-        pred_scores = torch.norm(s_vec + r_vec - torch.Tensor(e_embeddings), p=1, dim=-1)
+        pred_scores = torch.norm(s_vec + r_vec - e_embeddings, p=1, dim=-1)
         ranking = torch.argsort(pred_scores).tolist()
         top_k_indices = ranking[:10]
         if o_true_idx in top_k_indices:

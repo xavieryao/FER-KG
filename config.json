@@ -10,11 +10,26 @@
         "nhead": 2,
         "dim_feedforward": 128,
         "dropout": 0.25,
-        "trans-e-model": "checkpoints/trans-e-bak/trans-e-best.pt"
+        "trans-e-model": "checkpoints/trans-e-best.pt"
     },
     {
         "name": "6ctx",
         "parent": "base",
         "num_context": 6
+    },
+    {
+        "name": "more-td",
+        "parent": "base",
+        "min_entity_freq": 0.3
+    },
+    {
+        "name": "more-td-dropout",
+        "parent": "more-td",
+        "dropout": 0.5
+    },
+    {
+        "name": "long-ctx",
+        "parent": "more-td",
+        "length": 3
     }
 ]

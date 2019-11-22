@@ -140,6 +140,13 @@ class FilteredFB5KDataset:
         entity_set = set(x[0] for x in self.entities)
         relation_set = set(x[0] for x in self.relations)
 
+        self.low_freq_triplets = []
+        for (s, r, o) in kg.triplets:
+            if s not in entity_set or o not in entity_set:
+                self.low_freq_triplets.append((s, r, o))
+        print("# low", len(self.low_freq_triplets))
+        random.shuffle(self.low_freq_triplets)
+
         self.triplets = kg.triplets
         print('# Entity', len(entity_set))
         print('# Relation', len(relation_set))
