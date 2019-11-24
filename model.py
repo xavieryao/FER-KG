@@ -28,11 +28,12 @@ class MarginRankingLoss(nn.Module):
 
     def forward(self, pos_scores, neg_scores, s_freqs, o_freqs):
         dist = self.margin + pos_scores - neg_scores
+        dist = torch.max(torch.zeros((1,), device=device), dist)
         if config['gamma'] != 1:
             s_freqs = s_freqs.to(device)
             o_freqs = o_freqs.to(device)
             dist = (s_freqs.pow(-config['gamma']) + o_freqs.pow(-config['gamma'])) / 2 * dist
-        return torch.mean(torch.max(torch.zeros((1,), device=device), dist))
+        return torch.mean(dist)
 
 
 class TransEModel(SavableModel):
@@ -73,8 +74,8 @@ def validate(model: nn.Module):
 
 
 def train(model: SavableModel):
-    train_writer = SummaryWriter('runs/TransE_train')
-    val_writer = SummaryWriter('runs/TransE_val')
+    train_writer = SummaryWriter(f"runs/TransE_{config['name']}_train")
+    val_writer = SummaryWriter(f"runs/TransE_{config['name']}_val")
     dataset = FB5KDataset.get_instance()
 
     criterion: nn.Module = MarginRankingLoss(margin=10.0)
@@ -128,7 +129,7 @@ def train(model: SavableModel):
 
                 if valid_score < best_val_score:
                     best_val_score = valid_score
-                    model.save('checkpoints/trans-e-best.pt')
+                    model.save(f"checkpoints/trans-e-{config['name']}-best.pt")
 
 
 def main():
