@@ -90,7 +90,13 @@ def train(model: SavableModel):
 
     best_val_score = float('+inf')
     for epoch in range(1000):
-        data_generator = dataset.get_batch_generator(batch_size=128)
+        if config['curriculum']:
+            curriculum = epoch // config['batch_per_curriculum']
+            if curriculum == config['num_curriculums']:
+                break
+            data_generator = dataset.get_batch_generator(batch_size=128, curriculum=curriculum, total_curriculums=config['num_curriculums'])
+        else:
+            data_generator = dataset.get_batch_generator(batch_size=128)
         running_loss = 0.0
         running_score = 0.0
         for i, (pos_triplets, neg_triplets) in enumerate(data_generator):

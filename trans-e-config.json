@@ -12,6 +12,8 @@
     {
         "name": "curriculum-learning",
         "parent": "base",
-        "curriculum": true
+        "curriculum": true,
+        "num_curriculums": 5,
+        "batch_per_curriculum": 50
     }
 ]

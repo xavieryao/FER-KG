@@ -112,12 +112,13 @@ class FB5KDataset:
         else:
             n = len(self.entity_counter)
             n_per_curriculum = n // total_curriculums
-            all_entities = [x[0] for x in self.entity_counter.most_common(curriculum * n_per_curriculum, (curriculum + 1) * n_per_curriculum)]
+            all_entities = [x[0] for x in self.entity_counter.most_common()[curriculum * n_per_curriculum: (curriculum + 1) * n_per_curriculum]]
             all_entities_set = set(all_entities)
             all_triplets = []
             for s, r, o in self.triplets:
                 if s in all_entities_set or o in all_entities_set:
                     all_triplets.append((s, r, o))
+            all_triplets_set = set(all_triplets)
 
         if shuffle:
             random.shuffle(all_triplets)
