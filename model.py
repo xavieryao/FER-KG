@@ -141,5 +141,5 @@ def main():
 if __name__ == '__main__':
     import sys
     from config import load_config
-    config = load_config('config.json', sys.argv[1])
+    config = load_config('trans-e-config.json', sys.argv[1])
     main()

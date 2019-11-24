@@ -94,8 +94,8 @@ class FB5KDataset:
             batch['r'].append(self.r2id.get(r, self.r2id['<UNK>']))
             batch['o'].append(self.e2id.get(o, self.e2id['<UNK>']))
 
-            batch['s-freq'] = self.entity_counter.get(s, total_entities) / total_entities
-            batch['o-freq'] = self.entity_counter.get(o, total_entities) / total_entities
+            batch['s-freq'].append(self.entity_counter.get(s, total_entities) / total_entities)
+            batch['o-freq'].append(self.entity_counter.get(o, total_entities) / total_entities)
 
         for k in ['s', 'r', 'o']:
             batch[k] = torch.LongTensor(batch[k])
