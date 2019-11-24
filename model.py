@@ -89,11 +89,11 @@ def train(model: SavableModel):
         pass
 
     best_val_score = float('+inf')
+    curriculum = 0
     for epoch in range(1000):
         if config['curriculum']:
-            curriculum = epoch // config['batch_per_curriculum']
-            if curriculum == config['num_curriculums']:
-                break
+            if curriculum * config['batch_per_curriculum'] > epoch and curriculum < config['num_curriculums'] - 1:
+                curriculum += 1
             data_generator = dataset.get_batch_generator(batch_size=128, curriculum=curriculum, total_curriculums=config['num_curriculums'])
         else:
             data_generator = dataset.get_batch_generator(batch_size=128)

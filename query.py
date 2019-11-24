@@ -54,11 +54,11 @@ def eval_kg_completion(checkpoint, ds='validation'):
         triplets = kg.test_triplets
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
-    #hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
-    #print("Hits@10", hits)
     score = scoring(kg, triplets, e_embeddings, r_embeddings)
     print('Test score', score)
+    hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
+    print("Hits@10", hits)
 
 
 if __name__ == '__main__':
-    eval_kg_completion('checkpoints/trans-e-best.pt', 'test')
+    eval_kg_completion('checkpoints/trans-e-adap-loss-best.pt', 'test')

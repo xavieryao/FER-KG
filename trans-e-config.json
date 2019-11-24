@@ -10,10 +10,10 @@
         "gamma": 0.05
     },
     {
-        "name": "curriculum-learning",
+        "name": "curr-learning",
         "parent": "base",
         "curriculum": true,
         "num_curriculums": 5,
-        "batch_per_curriculum": 50
+        "batch_per_curriculum": 40
     }
 ]
