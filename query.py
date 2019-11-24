@@ -28,7 +28,7 @@ def kg_completion(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
     return hits / len(triplets), sum(rank) / len(triplets)
 
 
-def eval_kg_completion(checkpoint):
+def eval_kg_completion(checkpoint, ds='validation'):
     kg = FB5KDataset.get_instance()
     model: TransEModel = TransEModel(num_entities=len(kg.e2id), num_relations=len(kg.r2id), embed_dim=50)
     model.load(checkpoint)
@@ -36,7 +36,10 @@ def eval_kg_completion(checkpoint):
     e_embeddings = model.export_entity_embeddings()
     r_embeddings = model.export_relation_embeddings()
 
-    triplets = kg.valid_triplets[:500]
+    if ds == 'validation':
+        triplets = kg.valid_triplets[:500]
+    else:
+        triplets = kg.test_triplets
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
     hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
@@ -44,4 +47,4 @@ def eval_kg_completion(checkpoint):
 
 
 if __name__ == '__main__':
-    eval_kg_completion('checkpoints/trans-e-best.pt')
+    eval_kg_completion('checkpoints/trans-e-best.pt', 'test')

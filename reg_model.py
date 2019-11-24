@@ -54,7 +54,8 @@ class EmbRegressionModel(SavableModel):
         self.context_length = context_length
         self.num_layers = num_layers
 
-        self.positional_encoding = PositionalEncoding(self.embed_dim, self.context_length)
+        if config['positional_encoding']:
+            self.positional_encoding = PositionalEncoding(self.embed_dim, self.context_length)
 
         self.context_encoder_layer = nn.TransformerEncoderLayer(embed_dim, nhead=config['nhead'], dim_feedforward=config['dim_feedforward'], dropout=config['dropout'])
         self.context_encoder_layer_norm = nn.LayerNorm([embed_dim])
@@ -181,7 +182,7 @@ def train(model: EmbRegressionModel):
         
 
         if epoch % 10 == 9:
-            hits, m_rk = test(model, filtered_dataset)
+            hits, m_rk = external_validation(model, filtered_dataset)
             val_writer.add_scalar('hits', hits, steps)
             val_writer.add_scalar('mean_rank', m_rk, steps)
 
@@ -193,16 +194,13 @@ def train(model: EmbRegressionModel):
                 model.save(f"checkpoints/reg_{config['name']}_best_mean_rank.pt")
 
 
-def external_val():
-    pass
-def external_eval(model, entities, text_Xs, triplets):
-
+def external_validation(model, filtered_dataset, top=500):
     kg = FB5KDataset.get_instance()
+    test_entities = list(set(kg.e2id.keys()) - set(x[0] for x in filtered_dataset.entities))
     trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), config['embed_dim'])
     trans_e_model.load(config['trans-e-model'])
     e_embeddings = trans_e_model.export_entity_embeddings()
     r_embeddings = trans_e_model.export_relation_embeddings()
-    """
 
     test_Xs, _ = next(filtered_dataset.get_batch_generator(
         entities=test_entities,
@@ -214,21 +212,57 @@ def external_eval(model, entities, text_Xs, triplets):
         length=config['length'],
         shuffle=False
     ))
-    """
+
+    triplets = filtered_dataset.low_freq_triplets[:top]
+    return external_eval(model, test_entities, test_Xs, triplets)
+
+
+def external_eval(model, entities, test_Xs, triplets):
+    kg = FB5KDataset.get_instance()
+    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), config['embed_dim'])
+    trans_e_model.load(config['trans-e-model'])
+    e_embeddings = trans_e_model.export_entity_embeddings()
+    r_embeddings = trans_e_model.export_relation_embeddings()
+
 
     test_Ys = model(test_Xs.to(device)).detach().cpu().numpy()
     new_e_embeddings = e_embeddings.copy()
-    for i, et in enumerate(test_entities):
+    repl = 0
+    for i, et in enumerate(entities):
+        if et not in kg.e2id:
+            continue
         et_id = kg.e2id[et]
         new_e_embeddings[et_id] = test_Ys[i]
+        repl += 1
 
-    print('predicted!')
+    print(f'replaced {repl} out of {len(entities)} embeddings')
     # evaluate kg completion
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
     print("Hits@10", hits[0], "meanRank", hits[1])
     return hits
+
+
+def test(model, filtered_dataset):
+    kg = FB5KDataset.get_instance()
+    trans_e_model = TransEModel(len(kg.e2id), len(kg.r2id), config['embed_dim'])
+    trans_e_model.load(config['trans-e-model'])
+    e_embeddings = trans_e_model.export_entity_embeddings()
+    r_embeddings = trans_e_model.export_relation_embeddings()
+    test_Xs = filtered_dataset.get_test_data(
+        emb_dim=config['embed_dim'],
+        e_embeddings=e_embeddings,
+        r_embeddings=r_embeddings,
+        num_context=config['num_context'],
+        length=config['length']
+    )
+    return external_eval(
+        model=model,
+        entities=filtered_dataset.test_entities,
+        test_Xs=test_Xs,
+        triplets=kg.test_triplets
+    )
 
 
 def main():
@@ -245,7 +279,7 @@ def main():
         model.load(sys.argv[3])
         kg = FB5KDataset.get_instance()
         filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=config['min_entity_freq'], min_relation_freq=0.5)
-        test(model, filtered_dataset, baseline=True, top=None)
+        test(model, filtered_dataset)
 
 
 if __name__ == '__main__':

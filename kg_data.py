@@ -163,7 +163,7 @@ class FilteredFB5KDataset:
         for s, _, o in kg.test_triplets:
             test_entity_set.add(s)
             test_entity_set.add(o)
-        self.test_entities = list(test_entity_set)
+        self.test_entities = list(test_entity_set - entity_set)
 
         # build index
         self.head_to_triplets, self.tail_to_triplets = self._build_index(self.triplets)
@@ -210,7 +210,7 @@ class FilteredFB5KDataset:
     def get_test_data(self, emb_dim, e_embeddings, r_embeddings, num_context, length):
         return next(
             self.get_batch_generator(self.test_entities, len(self.test_entities), emb_dim, e_embeddings,
-                                      r_embeddings, num_context, length, shuffle=False))
+                                      r_embeddings, num_context, length, shuffle=False))[0]
 
     def get_batch_generator(self, entities, batch_size, emb_dim, e_embeddings, r_embeddings, num_context, length,
                              shuffle=True):
@@ -226,7 +226,7 @@ class FilteredFB5KDataset:
             batch_Y = []
             for entity in entities_in_batch:
                 contexts = []
-                y_true = torch.Tensor(e_embeddings[self.e2id[entity]])
+                y_true = torch.Tensor(e_embeddings[self.e2id.get(entity, self.e2id['<UNK>'])])
                 for _ in range(num_context):
                     forward_path, backward_path = self.sample_relational_path(entity, length, rnd)
                     for _ in range(length - (len(forward_path) - 1) // 2):
