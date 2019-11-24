@@ -26,8 +26,12 @@ class MarginRankingLoss(nn.Module):
         super().__init__()
         self.margin = margin
 
-    def forward(self, pos_scores, neg_scores):
+    def forward(self, pos_scores, neg_scores, s_freqs, o_freqs):
         dist = self.margin + pos_scores - neg_scores
+        if config['gamma'] != 1:
+            s_freqs = s_freqs.to(device)
+            o_freqs = o_freqs.to(device)
+            dist = (s_freqs.pow(-config['gamma']) + o_freqs.pow(-config['gamma'])) / 2 * dist
         return torch.mean(torch.max(torch.zeros((1,), device=device), dist))
 
 
@@ -97,7 +101,7 @@ def train(model: SavableModel):
             pos_scores = model(pos_batch)
             neg_scores = model(neg_batch)
 
-            loss: torch.Tensor = criterion(pos_scores, neg_scores)
+            loss: torch.Tensor = criterion(pos_scores, neg_scores, pos_batch['s-freq'], pos_batch['o-freq'])
 
             loss.backward()
             optimizer.step()
@@ -127,12 +131,14 @@ def train(model: SavableModel):
                     model.save('checkpoints/trans-e-best.pt')
 
 
+def main():
+    dataset = FB5KDataset.get_instance()
+    model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=50)
+    model = model.to(device)
+    train(model)
+
 if __name__ == '__main__':
-    def main():
-        dataset = FB5KDataset.get_instance()
-        model = TransEModel(num_entities=len(dataset.e2id), num_relations=len(dataset.r2id), embed_dim=50)
-        model = model.to(device)
-        train(model)
-
-
+    import sys
+    from config import load_config
+    config = load_config('config.json', sys.argv[1])
     main()
