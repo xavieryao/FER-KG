@@ -104,10 +104,20 @@ class FB5KDataset:
 
         return batch
 
-    def get_batch_generator(self, batch_size, shuffle=True):
-        all_triplets_set = set(self.triplets)
-        all_triplets = list(all_triplets_set)
-        all_entities = list(self.e2id.keys())
+    def get_batch_generator(self, batch_size, shuffle=True, curriculum=None, total_curriculums=None):
+        if total_curriculums is None:
+            all_triplets_set = set(self.triplets)
+            all_triplets = list(all_triplets_set)
+            all_entities = list(self.e2id.keys())
+        else:
+            n = len(self.entity_counter)
+            n_per_curriculum = n // total_curriculums
+            all_entities = [x[0] for x in self.entity_counter.most_common(curriculum * n_per_curriculum, (curriculum + 1) * n_per_curriculum)]
+            all_entities_set = set(all_entities)
+            all_triplets = []
+            for s, r, o in self.triplets:
+                if s in all_entities_set or o in all_entities_set:
+                    all_triplets.append((s, r, o))
 
         if shuffle:
             random.shuffle(all_triplets)
