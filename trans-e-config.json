@@ -7,7 +7,7 @@
     {
         "name": "adap-loss",
         "parent": "base",
-        "gamma": 0.2
+        "gamma": 0.8
     },
     {
         "name": "curriculum-learning",

@@ -84,14 +84,24 @@ class FB5KDataset:
         batch = {
             's': [],
             'r': [],
-            'o': []
+            'o': [],
+            's-freq': [],
+            'o-freq': []
         }
+        total_entities = len(self.triplets) * 2
         for s, r, o in triplets:
             batch['s'].append(self.e2id.get(s, self.e2id['<UNK>']))
             batch['r'].append(self.r2id.get(r, self.r2id['<UNK>']))
             batch['o'].append(self.e2id.get(o, self.e2id['<UNK>']))
-        for k, v in batch.items():
-            batch[k] = torch.LongTensor(v)
+
+            batch['s-freq'] = self.entity_counter.get(s, total_entities) / total_entities
+            batch['o-freq'] = self.entity_counter.get(o, total_entities) / total_entities
+
+        for k in ['s', 'r', 'o']:
+            batch[k] = torch.LongTensor(batch[k])
+        for k in ['s-freq', 'o-freq']:
+            batch[k] = torch.Tensor(batch[k])
+
         return batch
 
     def get_batch_generator(self, batch_size, shuffle=True):
