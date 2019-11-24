@@ -9,7 +9,7 @@ def scoring(kg: FB5KDataset, triplets, e_embeddings, r_embeddings):
     e_embeddings = torch.Tensor(e_embeddings)
     r_embeddings = torch.Tensor(r_embeddings)
     scores = []
-    for (s, r, o_true) in tqdm(triplets):
+    for (s, r, o) in tqdm(triplets):
         s_vec = torch.Tensor(e_embeddings[kg.e2id.get(s, kg.e2id['<UNK>'])])
         r_vec = torch.Tensor(r_embeddings[kg.r2id.get(r, kg.r2id['<UNK>'])])
         o_vec = torch.Tensor(e_embeddings[kg.e2id.get(o, kg.e2id['<UNK>'])])
@@ -54,8 +54,10 @@ def eval_kg_completion(checkpoint, ds='validation'):
         triplets = kg.test_triplets
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
 
-    hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
-    print("Hits@10", hits)
+    #hits = kg_completion(kg, triplets, e_embeddings, r_embeddings)
+    #print("Hits@10", hits)
+    score = scoring(kg, triplets, e_embeddings, r_embeddings)
+    print('Test score', score)
 
 
 if __name__ == '__main__':

@@ -11,7 +11,7 @@ from torch.utils.tensorboard import SummaryWriter
 
 from kg_data import FB5KDataset, FilteredFB5KDataset
 from model import SavableModel, TransEModel
-from query import kg_completion
+from query import kg_completion, scoring
 from config import load_config
 
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
@@ -238,6 +238,9 @@ def external_eval(model, entities, test_Xs, triplets):
     print(f'replaced {repl} out of {len(entities)} embeddings')
     # evaluate kg completion
     triplets = [x for x in triplets if x[0] != '<UNK>' and x[1] != '<UNK>' and x[2] != '<UNK>']
+
+    score = scoring(kg, triplets, new_e_embeddings, r_embeddings)
+    print("Score", score)
 
     hits = kg_completion(kg, triplets, new_e_embeddings, r_embeddings)
     print("Hits@10", hits[0], "meanRank", hits[1])
