@@ -1,0 +1,17 @@
+[
+    {
+        "name": "base",
+        "curriculum": false,
+        "gamma": 1
+    },
+    {
+        "name": "adap-loss",
+        "parent": "base",
+        "gamma": 0.2
+    },
+    {
+        "name": "curriculum-learning",
+        "parent": "base",
+        "curriculum": true
+    }
+]
