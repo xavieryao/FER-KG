@@ -90,10 +90,8 @@ def train(model: SavableModel):
 
     best_val_score = float('+inf')
     curriculum = 0
-    for epoch in range(1000):
-        if config['curriculum']:
-            if curriculum * config['batch_per_curriculum'] > epoch and curriculum < config['num_curriculums'] - 1:
-                curriculum += 1
+    for epoch in range(250):
+        if config['curriculum'] and epoch < config['batch_per_curriculum']:
             data_generator = dataset.get_batch_generator(batch_size=128, curriculum=curriculum, total_curriculums=config['num_curriculums'])
         else:
             data_generator = dataset.get_batch_generator(batch_size=128)
@@ -116,8 +114,8 @@ def train(model: SavableModel):
             running_loss += loss.cpu().item()
             running_score += torch.mean(pos_scores).cpu().item()
             if i % 100 == 99:
-                print('[%d, %5d]     loss: %.6f     score: %.6f' %
-                      (epoch + 1, i + 1, running_loss / 100, running_score / 100))
+                print('[%d, %d, %5d]     loss: %.6f     score: %.6f' %
+                      (curriculum + 1, epoch + 1, i + 1, running_loss / 100, running_score / 100))
                 steps = epoch * (len(dataset.triplets) + 15) // 16 + i
                 train_writer.add_scalar('epoch', epoch + 1, steps)
                 train_writer.add_scalar('loss', running_loss / 100, steps)
@@ -128,14 +126,23 @@ def train(model: SavableModel):
 
             if i % 1000 == 999:
                 valid_score = validate(model)
-                print('[%d, %5d]     validation score: %.6f' %
-                      (epoch + 1, i + 1, valid_score))
+                print('[%d, %d, %5d]     validation score: %.6f' %
+                      (curriculum + 1, epoch + 1, i + 1, valid_score))
                 steps = epoch * (len(dataset.triplets) + 15) // 16 + i
                 val_writer.add_scalar('score', valid_score, steps)
 
                 if valid_score < best_val_score:
                     best_val_score = valid_score
                     model.save(f"checkpoints/trans-e-{config['name']}-best.pt")
+        valid_score = validate(model)
+        print('[%d, %5d]     validation score: %.6f' %
+                (epoch + 1, i + 1, valid_score))
+        steps = epoch * (len(dataset.triplets) + 15) // 16 + i
+        val_writer.add_scalar('score', valid_score, steps)
+
+        if valid_score < best_val_score:
+            best_val_score = valid_score
+            model.save(f"checkpoints/trans-e-{config['name']}-best.pt")
 
 
 def main():

@@ -61,4 +61,4 @@ def eval_kg_completion(checkpoint, ds='validation'):
 
 
 if __name__ == '__main__':
-    eval_kg_completion('checkpoints/trans-e-adap-loss-best.pt', 'test')
+    eval_kg_completion('checkpoints/trans-e-cr-2-best.pt', 'test')

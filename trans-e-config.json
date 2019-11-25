@@ -15,5 +15,19 @@
         "curriculum": true,
         "num_curriculums": 5,
         "batch_per_curriculum": 40
+    },
+    {
+        "name": "cr-10",
+        "parent": "base",
+        "curriculum": true,
+        "num_curriculums": 5,
+        "batch_per_curriculum": 10
+    },
+    {
+        "name": "cr-2",
+        "parent": "base",
+        "curriculum": true,
+        "num_curriculums": 2,
+        "batch_per_curriculum": 100
     }
 ]
