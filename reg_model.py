@@ -153,6 +153,7 @@ def train(model: EmbRegressionModel):
             steps += len(batch_X)
             optimizer.zero_grad()
 
+            model.train()
             Y_pred = model(batch_X)
             loss = criterion(batch_Y, Y_pred)
             loss.backward()
@@ -170,6 +171,7 @@ def train(model: EmbRegressionModel):
 
                 running_loss = 0.0
         # validate after each epoch
+        model.eval()
         val_loss = validate(model, valid_X, valid_Y)
         print('[%d]     val loss: %.6f' %
               (epoch + 1,  val_loss))
@@ -280,6 +282,7 @@ def main():
         train(model)
     elif sys.argv[1] == 'test':
         model.load(sys.argv[3])
+        model.eval()
         kg = FB5KDataset.get_instance()
         filtered_dataset = FilteredFB5KDataset(kg, min_entity_freq=config['min_entity_freq'], min_relation_freq=0.5)
         test(model, filtered_dataset)
